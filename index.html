@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Category / Product Gallery</title>
+
+<style>
+:root{
+  --bg:#0b0b0d; --card:#151518; --text:#fff;
+  --muted:#b5b5b5; --accent:#6ea8ff;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text)}
+header{max-width:1200px;margin:auto;padding:40px 20px}
+h1{margin:0;font-size:2.4rem}
+h2{margin:0;font-size:1.4rem}
+p{color:var(--muted);margin:10px 0 0}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:20px;
+  max-width:1200px;
+  margin:auto;
+  padding:20px
+}
+.card{
+  background:var(--card);
+  border-radius:14px;
+  overflow:hidden;
+  cursor:pointer;
+  transform:translateY(12px);
+  opacity:0;
+  animation:fadeUp .45s ease forwards;
+  transition:transform .25s ease;
+}
+.card:hover{transform:translateY(-4px)}
+.thumb{position:relative}
+.thumb img,.thumb video{
+  width:100%;height:200px;object-fit:cover;display:block;
+  filter:saturate(1.05) contrast(1.02);
+}
+.thumb::after{
+  content:"";
+  position:absolute;inset:0;
+  background:linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0));
+  pointer-events:none;
+}
+.body{padding:16px}
+
+.masonry{columns:1;gap:16px;padding:20px;max-width:1200px;margin:auto}
+@media(min-width:700px){.masonry{columns:2}}
+@media(min-width:1100px){.masonry{columns:3}}
+
+.tile{break-inside:avoid;margin-bottom:16px;cursor:pointer;position:relative}
+.tile img,.tile video{width:100%;border-radius:12px;display:block}
+.badge{
+  position:absolute;top:10px;right:10px;
+  background:rgba(0,0,0,.6);
+  padding:4px 8px;border-radius:6px;
+  font-size:.75rem
+}
+.back{
+  margin:20px;display:inline-block;cursor:pointer;color:var(--accent);
+  user-select:none;
+}
+
+/* Lightbox */
+#lightbox{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);
+  display:none;align-items:center;justify-content:center;z-index:999
+}
+#lightbox.active{display:flex}
+#lightbox img,#lightbox video{
+  max-width:90vw;max-height:90vh;border-radius:12px;
+}
+.close{
+  position:fixed;top:18px;right:22px;font-size:2rem;cursor:pointer;user-select:none;
+}
+@keyframes fadeUp{to{opacity:1;transform:none}}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1 id="title">Categories</h1>
+  <p id="subtitle">Select a category</p>
+</header>
+
+<div id="content"></div>
+
+<div id="lightbox" onclick="if(event.target.id==='lightbox')closeLightbox()">
+  <div class="close" onclick="closeLightbox()">×</div>
+  <div id="lightboxContent"></div>
+</div>
+
+<script>
+/*
+  ========= YOUR FOLDER STRUCTURE =========
+  media/<CategoryName>/<ProductName>/
+    - images: <imgPrefix>1.jpg, <imgPrefix>2.jpg ... (you choose how many)
+    - optional video: <videoName>.mp4
+
+  Example from your screenshot:
+  media/Rings/Product_1/
+    c1_p1_1.jpg ... c1_p1_8.jpg
+    c1_p1.mp4
+
+  NOTE:
+  - This file cannot auto-scan folders when opened locally.
+  - So you declare each product folder + naming pattern below, and the code builds URLs.
+*/
+
+/* ========= EDIT ONLY THIS DATA ========= */
+const CATEGORIES = [
+  {
+    title: "Rings",
+    products: [
+      {
+        title: "Product_1",
+        folder: "media/Rings/Product_1/",
+        imgPrefix: "c1_p1_",     // will generate c1_p1_1.jpg ... c1_p1_8.jpg
+        imgCount: 8,
+        video: "c1_p1.mp4"       // set to "" if no video
+      },
+      {
+        title: "Product_2",
+        folder: "media/Rings/Product_2/",
+        imgPrefix: "c1_p2_",
+        imgCount: 5,
+        video: "c1_p2.mp4"
+      },
+      {
+        title: "Product_3",
+        folder: "media/Rings/Product_3/",
+        imgPrefix: "c1_p3_",
+        imgCount: 4,
+        video: "c1_p3.mp4"
+      },
+       {
+        title: "Product_4",
+        folder: "media/Rings/Product_4/",
+        imgPrefix: "c1_p4_",
+        imgCount: 4,
+        video: "c1_p4.mp4"
+      },     
+    ]
+  },
+  {
+    title: "Bracelets",
+    products: [
+      {
+        title: "Product_1",
+        folder: "media/Bracelets/Product_1/",
+        imgPrefix: "b_p1_",
+        imgCount: 6,
+        video: "b_p1.mp4"
+      },
+      {
+        title: "Product_2",
+        folder: "media/Bracelets/Product_2/",
+        imgPrefix: "b_p2_",
+        imgCount: 4,
+        video: "b_p2.mp4"
+      }
+    ]
+  },
+  {
+    title: "Necklace",
+    products: [
+      {
+        title: "Product_1",
+        folder: "media/Necklace/Product_1/",
+        imgPrefix: "n_p1_",
+        imgCount: 5,
+        video: "n_p1.mp4"
+      }
+    ]
+  },
+  {
+    title: "Necklace and Earring",
+    products: [
+      {
+        title: "Product_1",
+        folder: "media/Necklace and Earring/Product_1/",
+        imgPrefix: "ne_p1_",
+        imgCount: 5,
+        video: "ne_p1.mp4"
+      }
+    ]
+  },
+  {
+    title: "Pendant and Earring",
+    products: [
+      {
+        title: "Product_1",
+        folder: "media/Pendant and Earring/Product_1/",
+        imgPrefix: "pe_p1_",
+        imgCount: 5,
+        video: "pe_p1.mp4"
+      }
+    ]
+  }
+];
+/* ===================================== */
+
+const content = document.getElementById("content");
+const titleEl = document.getElementById("title");
+const subtitleEl = document.getElementById("subtitle");
+
+showCategories();
+
+/* Build media list for a product */
+function buildMedia(product){
+  const out = [];
+  for(let i=1;i<=product.imgCount;i++){
+    out.push(product.folder + product.imgPrefix + i + ".jpg");
+  }
+  if(product.video && product.video.trim()){
+    out.push(product.folder + product.video);
+  }
+  return out;
+}
+
+/* Thumbnail: first image if exists, else video */
+function thumbForProduct(p){
+  const media = buildMedia(p);
+  return media[0] || "";
+}
+function renderThumb(src){
+  if(!src) return `<div style="height:200px;background:linear-gradient(135deg,#222,#111)"></div>`;
+  const isVideo = src.toLowerCase().endsWith(".mp4");
+  return isVideo
+    ? `<video src="${escapeAttr(src)}" muted playsinline preload="metadata"></video>`
+    : `<img src="${escapeAttr(src)}" loading="lazy" alt="" />`;
+}
+
+/* Views */
+function showCategories(){
+  titleEl.innerText = "Categories";
+  subtitleEl.innerText = "Select a category";
+
+  content.innerHTML = `
+    <div class="grid">
+      ${CATEGORIES.map((cat,ci)=>{
+        const firstThumb = cat.products?.[0] ? thumbForProduct(cat.products[0]) : "";
+        return `
+          <div class="card" onclick="showProducts(${ci})">
+            <div class="thumb">${renderThumb(firstThumb)}</div>
+            <div class="body">
+              <h2>${escapeHtml(cat.title)}</h2>
+              <p>${cat.products?.length ?? 0} products</p>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function showProducts(ci){
+  const cat = CATEGORIES[ci];
+  titleEl.innerText = cat.title;
+  subtitleEl.innerText = "Select a product";
+
+  content.innerHTML = `
+    <span class="back" onclick="showCategories()">← Back</span>
+    <div class="grid">
+      ${cat.products.map((p,pi)=>{
+        const th = thumbForProduct(p);
+        const count = p.imgCount + (p.video && p.video.trim() ? 1 : 0);
+        return `
+          <div class="card" onclick="showGallery(${ci},${pi})">
+            <div class="thumb">${renderThumb(th)}</div>
+            <div class="body">
+              <h2>${escapeHtml(p.title)}</h2>
+              <p>${count} items</p>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function showGallery(ci,pi){
+  const p = CATEGORIES[ci].products[pi];
+  const media = buildMedia(p);
+
+  titleEl.innerText = p.title;
+  subtitleEl.innerText = CATEGORIES[ci].title;
+
+  content.innerHTML = `
+    <span class="back" onclick="showProducts(${ci})">← Back</span>
+    <div class="masonry">
+      ${media.map(src => tile(src)).join("")}
+    </div>
+  `;
+}
+
+function tile(src){
+  const isVideo = src.toLowerCase().endsWith(".mp4");
+  return `
+    <div class="tile" onclick="openLightbox('${escapeAttr(src)}')">
+      ${isVideo
+        ? `<video src="${escapeAttr(src)}" muted playsinline preload="metadata"></video><div class="badge">VIDEO</div>`
+        : `<img src="${escapeAttr(src)}" loading="lazy" alt=""/>`
+      }
+    </div>
+  `;
+}
+
+/* Lightbox */
+function openLightbox(src){
+  const box = document.getElementById("lightbox");
+  const c = document.getElementById("lightboxContent");
+  const isVideo = src.toLowerCase().endsWith(".mp4");
+
+  c.innerHTML = isVideo
+    ? `<video src="${escapeAttr(src)}" controls autoplay playsinline></video>`
+    : `<img src="${escapeAttr(src)}" alt=""/>`;
+
+  box.classList.add("active");
+}
+function closeLightbox(){
+  const box = document.getElementById("lightbox");
+  const c = document.getElementById("lightboxContent");
+  box.classList.remove("active");
+  c.innerHTML = "";
+}
+
+/* Helpers */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(s){
+  // safe inside single quotes for onclick + in src attributes
+  return String(s).replace(/'/g, "%27");
+}
+</script>
+
+</body>
+</html>
